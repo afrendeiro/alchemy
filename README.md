@@ -4,23 +4,28 @@ drugAnnotation
 Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEBI, KEGG, clinicaltrials.gov and create ontology with functional terms from drug annotation.
 
 # Usage
-usage: `python drugAnnotation.py [OPTIONS] file.csv`
+`python drugAnnotation.py [OPTIONS] file.csv`
 
-positional arguments:
+### positional arguments:
   infile                CSV file with drug smiles (and optionally names).
 
-optional arguments:
+### optional arguments:
   -h, --help            show this help message and exit
+
   -s SMILESCOLUMN, --smiles-column SMILESCOLUMN
                         Specify the column with the smile strings. Default is
                         column 1 (1-based).
+
   -n, --query-name      Annotate drugs by name as well as by smile. Off by
                         default.
+
   --names-column NAMESCOLUMN
                         Specify the column with drug names if available.
                         Default is column 2 (1-based).
+
   -l LOGFILE, --logfile LOGFILE
                         Specify the name of the log file.
+                        
   -v, --verbose         Verbose behaviour. Will print information to stdout.
 
 
