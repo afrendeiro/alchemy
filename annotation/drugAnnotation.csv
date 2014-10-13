@@ -1,0 +1,5 @@
+smiles,names,drugID,csID,csName,csSmile,chemblID,chemblName,chemblSmile,chemblKnown,chebiID,chebiName,chebiOntology,keggID,keggNames
+CC(=O)OC1=CC=CC=C1C(=O)O,aspirin,drug0,2157,Aspirin,CC(=O)OC1=CC=CC=C1C(=O)O,CHEMBL25,ASPIRIN,CC(=O)Oc1ccccc1C(=O)O,Yes,CHEBI:13719,acetylsalicylate,salicylate|acetylsalicylic acid|benzoates,D00109,"Aspirin (JP16/USP)| Aspalon (JAN)| Acetylsalicylic acid| Easprin (TN)
+dr:D02079"
+CN1[C@H]2CC[C@@H]1[C@H]([C@H](C2)OC(=O)C3=CC=CC=C3)C(=O)OC,cocaine,drug1,10194104,Cocaine,CN1[C@H]2CC[C@@H]1[C@H]([C@H](C2)OC(=O)C3=CC=CC=C3)C(=O)OC,CHEMBL369375,,COC(=O)C1[C@H](C[C@H]2CCC1N2C)OC(=O)c3ccccc3,No,CHEBI:41001,ecgonine benzoate,tropane alkaloid|epitope|metabolite|ecgonine|benzoate ester,D00110,"Cocaine (USP)| Cocaine (TN)
+dr:D02182"
