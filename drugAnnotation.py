@@ -10,7 +10,6 @@ import os, sys, logging, csv, re, bioservices, urllib2
 from chemspipy import ChemSpider
 import numpy as np
 import pandas as pd
-import BeautifulSoup as bsoup
 from BeautifulSoup import BeautifulStoneSoup
 
 import matplotlib.pyplot as plt
