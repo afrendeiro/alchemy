@@ -25,9 +25,13 @@ Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEB
 
   -l LOGFILE, --logfile LOGFILE
                         Specify the name of the log file.
-                        
+
   -v, --verbose         Verbose behaviour. Will print information to stdout.
 
+
+# Requirements
+To install all requirements simply run:
+`pip install -r requirements.txt`
 
 # Drug annotation
 The main goal is the functional annotation of drugs from different sources, so I extract only information that allows easier identification of the drugs (IDs, SMILES, etc...) and any information related with the drug function.
@@ -54,3 +58,9 @@ Only completed studies are inspected. Study title, url and outcome are extracted
 
 # Functional terms ontology
 Based on ChEBI terms, an ontology is built for all drugs with annotation, which allows testing for term enrichment in drug subsets.
+
+
+# Output
+Individual csv files are created for each origin of annotation.
+A concatenated set is in `drugAnnotation.csv`.
+All files produced are in `/results`.

@@ -1,0 +1,7 @@
+bioservices
+chemspipy
+numpy
+scipy
+pandas
+BeautifulSoup
+matplotlib
