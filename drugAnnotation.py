@@ -78,9 +78,9 @@ def main():
     v = args.verbose
 
     # Make column numbers 0-based
-    args.smilesColumn = args.smilesColumn - 1
+    args.smilesColumn -= 1
     if args.queryName:
-        args.namesColumn = args.namesColumn - 1
+        args.namesColumn -= 1
 
     # Infile to pandas data.frame
     if v:
@@ -127,13 +127,6 @@ def main():
         # write to file
         keggInfo.to_csv('annotation/keggInfo.csv', index = False, encoding='utf-8')
 
-    # read data if already annotated
-    #drugInfo = pd.io.parsers.read_csv('drugInfo.csv')
-    #csInfo = pd.io.parsers.read_csv('csInfo.csv')
-    #chemblInfo = pd.io.parsers.read_csv('chemblInfo.csv')
-    #chebiInfo = pd.io.parsers.read_csv('chebiInfo.csv')
-    #keggInfo = pd.io.parsers.read_csv('keggInfo.csv')
-
     # concatenate dataframes
     if v:
         print("Concatenating annotations")
@@ -143,8 +136,6 @@ def main():
     if args.queryName:
         drugAnnotation = pd.merge(drugAnnotation, keggInfo, how = 'left', on = 'drugID')
     drugAnnotation.to_csv('annotation/drugAnnotation.csv', index = False, encoding='utf-8')
-
-    drugAnnotation = pd.io.parsers.read_csv('drugAnnotation.csv')
 
     # Annotate ChEMBL info with assays
     if v:
@@ -466,10 +457,10 @@ def splitOntologyTerms(df):
         if not pd.isnull(string):
             terms = string.split('|')
             for term in terms:
-                SET.append((term, df['chebiID'][i], df['drugID'][i]))
+                SET.append((df['drugID'][i], df['chebiID'][i], term))
 
     SET = pd.DataFrame(SET)
-    SET.columns = ['term', 'chebiID', 'drugID']
+    SET.columns = ['drugID', 'chebiID', 'term']
     return SET
 
 def queryClinicalTrials(names):

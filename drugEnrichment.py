@@ -4,16 +4,11 @@
 Test enrichment of terms in a subset of drugs, given annotation of all drugs.
 """
 
-import os, sys, logging, csv, re, bioservices, urllib2
-from chemspipy import ChemSpider
+from argparse import ArgumentParser
+import os, sys, logging, csv, re
 import numpy as np
 from scipy.stats import fisher_exact
 import pandas as pd
-import BeautifulSoup as bsoup
-from BeautifulSoup import BeautifulStoneSoup
-
-import matplotlib.pyplot as plt
-from argparse import ArgumentParser
 from collections import Counter
 
 __author__ = "Andre Rendeiro"
@@ -35,8 +30,19 @@ def main():
     parser.add_argument('testFile',
         help = 'CSV file with drugs to test.')
     parser.add_argument('universe',
-        help = 'CSV file with annotation.')
+        help = 'CSV file with annotation of all drugs (universe).')
     # optional arguments
+    parser.add_argument('-t', '--id-column-test', type = int, default = 1, dest = 'idColumnTest',
+        help = 'Specify the column with an ID string for the test file. Default is column 1 (1-based).')
+    parser.add_argument('-u', '--id-column-univ', type = int, default = 1, dest = 'idColumnUniv',
+        help = 'Specify the column with an ID string for the universe file. Default is column 1 (1-based).')
+    parser.add_argument('-o', '--ontology-column', type = int, default = 3, dest = 'ontologyColumn',
+        help = 'Specify the column with the ontology strings in the universe file. Default is column 3 (1-based).')
+    parser.add_argument('-n', '--ontology-name', action='store_true', dest = 'names',
+        help = 'Ontology file has name column. Will be used to when displaying output. Off by default.')
+    parser.set_defaults(queryName = False)
+    parser.add_argument('-s', '--score-column', type = int, default = 0, dest = 'scoreColumn',
+        help = 'OPTIONAL: Specify a column with a score to test enrichment dependent on signal of the score (will split entries and perform test seperately for entries with positive and negative score) - 1-based.')
     parser.add_argument('-l', '--logfile', default = "log.txt", dest = 'logFile',
         help = 'Specify the name of the log file.')
     parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose',
@@ -63,57 +69,71 @@ def main():
     global v
     v = args.verbose
 
-    drugAnnotation = pd.io.parsers.read_csv(args.universe)
+    global names
+    names = args.names
 
-    # Create ontology
-    # Remove duplicates based on slimes
-    drugAnnotation = drugAnnotation.drop_duplicates('OUR_SMILES')
-    universe = drugAnnotation[pd.notnull(drugAnnotation['chebiOntology'])]
+    # Make column numbers 0-based
+    args.idColumnTest -= 1
+    args.idColumnUniv -= 1
+    args.ontologyColumn -= 1
+
+    universe = pd.io.parsers.read_csv(args.universe)
+
+    ### Create ontology
+    # rename drugID column
+    universe.rename(columns = {universe.columns[args.idColumnUniv]: 'drugID'}, inplace = True)
+    # Remove duplicates based on drugID
+    universe = universe.drop_duplicates('drugID')
+    # rename ontology column
+    universe.rename(columns = {universe.columns[args.ontologyColumn]: 'chebiOntology'}, inplace = True)
+    universe = universe[pd.notnull(universe['chebiOntology'])]
     universe = universe.set_index([range(len(universe))])
 
-    # get file name
-    name = re.sub('.csv', '', args.testFile)
-    # Read in
+    ### Test file
+    testName = re.sub('.csv', '', args.testFile)
     testSet = pd.io.parsers.read_csv(args.testFile)
-    # Retrieve only informative columns
-    if 'extended' in args.testFile:
-        testSet = pd.concat([testSet.ix[:,20], testSet.ix[:,9]], axis=1, keys=['OUR_SMILES', 'score'])
-    else:
-        testSet = pd.concat([testSet.ix[:,2], testSet.ix[:,12], testSet.ix[:,13]], axis=1, keys=['OUR_SMILES', 'change', 'p-value'])
+    # rename drugID column
+    testSet.rename(columns = {testSet.columns[args.idColumnTest]: 'drugID'}, inplace = True)
     # Remove duplicates based on slimes
-    testSet = testSet.drop_duplicates('OUR_SMILES')
-    # Remove rows without smile
-    testSet = testSet[pd.notnull(testSet['OUR_SMILES'])]
-    # annotate testSet files with drugAnnotation
-    testSet = pd.merge(testSet, drugAnnotation, how = 'left', on = 'OUR_SMILES')
+    testSet = testSet.drop_duplicates('drugID')
+    # Remove rows without drugID
+    testSet = testSet[pd.notnull(testSet['drugID'])]
+    # annotate testSet files with universe
+    if names:
+        testSet = testSet[['drugID', 'names']]
+    else:
+        testSet = pd.DataFrame(testSet['drugID'])
+
+    testSet = pd.merge(testSet, universe, how = 'left', on = 'drugID')
+    
     # exclude drugs not annotated
     testSet = testSet[pd.notnull(testSet['chebiOntology'])]
 
-    # filter by p-value (optional)
-    #testSetSetPos = testSet[testSet['p-value'] < 0.01]
-    if 'extended' in args.testFile:
-        testSet = testSet[['cemmID', 'chebiID', 'chebiOntology', 'DRUG_NAME']]
-        print("Drugs enriched in file %s:" % args.testFile)
+    if args.scoreColumn == 0:
+        if v:
+            print("Drugs enriched in file %s:" % args.testFile)
         testSetEnrich = testEnrichment(universe, testSet)
 
-        # Export significant data
+        # Export tested data
         testSetEnrichExport = pd.DataFrame(testSetEnrich).T
         testSetEnrichExport.columns = ['odds_ratio', 'p-value', 'counts', 'drugs with term']
         testSetEnrichExport = testSetEnrichExport.sort('p-value')
-        testSetEnrichExport.to_csv(name + '_tested.csv', index = True, encoding='utf-8')
+        testSetEnrichExport.to_csv(testName + '_tested.csv', index = True, encoding='utf-8')
     else:
-        # separate positive and negative changes
-        testSetSetPos = testSet[testSet['change'] > 0]
-        testSetSetPos = testSetSetPos[['cemmID', 'chebiID', 'chebiOntology', 'DRUG_NAME']]
-        testSetSetNeg = testSet[testSet['change'] < 0]
-        testSetSetNeg = testSetSetNeg[['cemmID', 'chebiID', 'chebiOntology', 'DRUG_NAME']]
+        # rename score column
+        testSet.rename(columns = {testSet.columns[args.scoreColumn - 1]: 'score'}, inplace = True)
 
-        print("Positive drugs enriched in file %s:" % args.testFile)
+        # separate positive and negative scores
+        testSetSetPos = testSet[testSet['score'] > 0]
+        testSetSetNeg = testSet[testSet['score'] < 0]
+        if v:
+            print("Positive drugs enriched in file %s:" % args.testFile)
         testSetPosEnrich = testEnrichment(universe, testSetSetPos)
-        print("Negative drugs enriched in file %s:" % args.testFile)
+        if v:
+            print("Negative drugs enriched in file %s:" % args.testFile)
         testSetNegEnrich = testEnrichment(universe, testSetSetNeg)
 
-        # Export significant data
+        # Export tested data
         testSetEnrichPosExport = pd.DataFrame(testSetPosEnrich).T
         testSetEnrichPosExport['direction'] = 'positive'
         testSetEnrichNegExport = pd.DataFrame(testSetNegEnrich).T
@@ -122,7 +142,7 @@ def main():
         testSetEnrichExport = pd.concat([testSetEnrichPosExport, testSetEnrichNegExport])
         testSetEnrichExport.columns = ['odds_ratio', 'p-value', 'counts', 'drugs with term', 'direction']
         testSetEnrichExport = testSetEnrichExport.sort('p-value')
-        testSetEnrichExport.to_csv(name + '_tested.csv', index = True, encoding='utf-8')
+        testSetEnrichExport.to_csv(testName + '_tested.csv', index = True, encoding='utf-8')
 
 
 def splitOntologyTerms(df):
@@ -138,25 +158,12 @@ def splitOntologyTerms(df):
         if not pd.isnull(string):
             terms = string.split('|')
             for term in terms:
-                SET.append((term, df['chebiID'][i], df['cemmID'][i]))
+                SET.append((df['drugID'][i], df['chebiID'][i], term))
 
     SET = pd.DataFrame(SET)
-    SET.columns = ['term', 'chebiID', 'cemmID']
+    SET.columns = ['drugID', 'chebiID', 'term']
     return SET
     
-    
-def countDrugsWithTerm(drugSet, term):
-    """
-    DEPRECATED!.
-    """
-    counts = [0,0]
-    for drug in drugSet['term']:
-        if drug == term:
-            counts[0] += 1
-        else:
-            counts[1] += 1
-    return counts
-
 
 def testEnrichment(universe, drugSet):
     """
@@ -178,7 +185,10 @@ def testEnrichment(universe, drugSet):
         for drug in range(len(drugSet)):
             if term in drugSet.chebiOntology[drug].split('|'):
                 counts[0][0] += 1
-                drugs.append((drugSet['cemmID'][drug], drugSet['DRUG_NAME'][drug]))
+                if names:
+                    drugs.append((drugSet['drugID'][drug], drugSet['names'][drug]))
+                else:
+                    drugs.append(drugSet['drugID'][drug])
             else:
                 counts[0][1] += 1
 
