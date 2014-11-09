@@ -1,7 +1,9 @@
 drugAnnotation
 ==============
 
-Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEBI, KEGG, clinicaltrials.gov and create ontology with functional terms from drug annotation.
+Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEBI, KEGG, clinicaltrials.gov.
+
+Create ontology with functional terms from drug annotation and perform tests of functional enrichment of drugs with a Fisher exact test.
 
 # Usage
 `python drugAnnotation.py [OPTIONS] file.csv`
@@ -65,4 +67,5 @@ When running chemical screens, the effect of interesting drugs may have contrast
 # Running tests
 
 `python drugAnnotation.py testAnnotation.csv`
+
 `python drugEnrichment.py --id-column-test 3 testEnrichment.csv annotation/universeOntology.csv`
