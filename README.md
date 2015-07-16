@@ -6,11 +6,13 @@ Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEB
 Create ontology with functional terms from drug annotation and perform tests of functional enrichment of drugs with a Fisher exact test.
 
 # Usage
-`python drugAnnotation.py [OPTIONS] file.csv`
+`python drugAnnotation.py [OPTIONS] <file.csv> <output directory>`
 
 and
 
-`python drugEnrichment.py [OPTIONS] test.csv universe.csv`
+`python drugEnrichment.py [OPTIONS] test.csv universe.csv <output directory>`
+
+
 
 # Requirements
 To install all requirements simply run:

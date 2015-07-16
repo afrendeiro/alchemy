@@ -6,14 +6,18 @@ and create ontology with functional terms from drug annotation.
 """
 
 from argparse import ArgumentParser
-import os, sys, logging, csv, re, bioservices, urllib2
-from chemspipy import ChemSpider
-import numpy as np
-import pandas as pd
 from BeautifulSoup import BeautifulStoneSoup
+# from chemspipy import ChemSpider
+import bioservices
+import csv
+import logging
+import numpy as np
+import os
+import pandas as pd
+import re
+import sys
+import urllib2
 
-import matplotlib.pyplot as plt
-from collections import Counter
 
 __author__ = "Andre Rendeiro"
 __copyright__ = "Copyright 2014, Andre F. Rendeiro"
@@ -27,26 +31,27 @@ __status__ = "Development"
 def main():
     # argparser    
     parser = ArgumentParser(
-        description = """Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEBI, KEGG, clinicaltrials.gov,
+        description="""Annotate drugs based on SMILE string or drug names from ChemSpider, ChEMBL, ChEBI, KEGG, clinicaltrials.gov,
         and create ontology with functional terms from drug annotation.
-        """,
-        usage       = 'python drugAnnotation.py [OPTIONS] file.csv'
-        )
+        """
+    )
     # positional arguments
     parser.add_argument('infile',
-        help = 'CSV file with drug smiles (and optionally names).')
+        help='CSV file with drug smiles (and optionally names).')
+    parser.add_argument('outputFolder',
+        help='Folder name to be created and containing output. Will overwrite existing files!')
     # optional arguments
-    parser.add_argument('-s', '--smiles-column', type = int, default = 1, dest = 'smilesColumn',
-        help = 'Specify the column with the smile strings. Default is column 1 (1-based).')
-    parser.add_argument('-n', '--query-name', action='store_true', dest = 'queryName',
-        help = 'Annotate drugs by name as well as by smile. Off by default.')
-    parser.set_defaults(queryName = False)
-    parser.add_argument('--names-column', type = int,  dest = 'namesColumn',
-        help = 'Specify the column with drug names if available. Default is column 2 (1-based).')
-    parser.add_argument('-l', '--logfile', default = "log.txt", dest = 'logFile',
-        help = 'Specify the name of the log file.')
-    parser.add_argument('-v', '--verbose', action = 'store_true', dest = 'verbose',
-        help = "Verbose behaviour. Will print information to stdout.", default = False)
+    parser.add_argument('-s', '--smiles-column', type=int, default=1, dest='smilesColumn',
+        help='Specify the column with the smile strings. Default is column 1 (1-based).')
+    parser.add_argument('-n', '--query-name', action='store_true', dest='queryName',
+        help='Annotate drugs by name as well as by smile. Off by default.')
+    parser.set_defaults(queryName=False)
+    parser.add_argument('--names-column', type=int,  dest='namesColumn',
+        help='Specify the column with drug names if available. Default is column 2 (1-based).')
+    parser.add_argument('-l', '--logfile', default="log.txt", dest='logFile',
+        help='Specify the name of the log file.')
+    parser.add_argument('-v', '--verbose', action='store_true', dest='verbose',
+        help="Verbose behaviour. Will print information to stdout.", default=False)
 
     # parse
     args = parser.parse_args()
@@ -82,10 +87,14 @@ def main():
     if args.queryName:
         args.namesColumn -= 1
 
+    # Make output directory
+    if not os.path.exists(args.outputFolder):
+        os.mkdir(args.outputFolder)
+
     # Infile to pandas data.frame
     if v:
         print("Reading in infile: %s" % args.infile)
-    drugInfo = pd.io.parsers.read_csv(args.infile)
+    drugInfo = pd.read_csv(args.infile)
     # rename smiles column
     drugInfo.rename(columns = {drugInfo.columns[args.smilesColumn]: 'smiles'}, inplace = True)
     # rename names column
@@ -96,28 +105,35 @@ def main():
 
     # add drugID column
     drugInfo['drugID'] = ['drug%s' % digit for digit in range(len(drugInfo))]
-    drugInfo.to_csv('annotation/drugInfo.csv', index = False, encoding='utf-8')
+    drugInfo.to_csv(os.path.join(args.outputFolder, 'drugInfo.csv'), index = False, encoding='utf-8')
 
     # query ChemSpider
     if v:
         print("Annotating with ChemSpider")
-    csInfo = chemSpiderQuery(drugInfo['smiles'])
+    # csInfo = chemSpiderQuery(drugInfo['smiles'])
     # write to file
-    csInfo.to_csv('annotation/csInfo.csv', index = False, encoding='utf-8')
+    # csInfo.to_csv(os.path.join(args.outputFolder, 'csInfo.csv'), index = False, encoding='utf-8')
 
     # query ChEMBL
     if v:
         print("Annotating with ChEMBL")
     chemblInfo = chemblQuery(drugInfo['smiles'])
     # write to file
-    chemblInfo.to_csv('annotation/chemblInfo.csv', index = False, encoding='utf-8')
+    chemblInfo.to_csv(os.path.join(args.outputFolder, 'chemblInfo.csv'), index = False, encoding='utf-8')
 
     # query ChEBI
     if v:
         print("Annotating with ChEBI")
     chebiInfo = chebiQuery(drugInfo['smiles'])
     # write to file
-    chebiInfo.to_csv('annotation/chebiInfo.csv', index = False, encoding='utf-8')
+    chebiInfo.to_csv(os.path.join(args.outputFolder, 'chebiInfo.csv'), index = False, encoding='utf-8')
+
+    # Annotate ChEMBL info with assays
+    if v:
+        print("Annotating ChEMBL with assay information")
+    chemblAssays = annotateChEMBL(chemblInfo)
+    # write to file
+    chemblAssays.to_csv(os.path.join(args.outputFolder, 'chemblAssays.csv'), index = False, encoding='utf-8')
 
     # query KEGG by name
     if args.queryName:
@@ -125,29 +141,31 @@ def main():
             print("Annotating with KEGG")
         keggInfo = keggQuery(drugInfo['names'])
         # write to file
-        keggInfo.to_csv('annotation/keggInfo.csv', index = False, encoding='utf-8')
-
-    # concatenate dataframes
-    if v:
-        print("Concatenating annotations")
-    drugAnnotation = pd.merge(drugInfo, csInfo, how = 'left', on = 'drugID')
-    drugAnnotation = pd.merge(drugAnnotation, chemblInfo, how = 'left', on = 'drugID')
-    drugAnnotation = pd.merge(drugAnnotation, chebiInfo, how = 'left', on = 'drugID')
-    if args.queryName:
-        drugAnnotation = pd.merge(drugAnnotation, keggInfo, how = 'left', on = 'drugID')
-    drugAnnotation.to_csv('annotation/drugAnnotation.csv', index = False, encoding='utf-8')
-
-    # Annotate ChEMBL info with assays
-    if v:
-        print("Annotating ChEMBL with assay information")
-    chemblAnnot = annotateChEMBL(chemblInfo)
+        keggInfo.to_csv(os.path.join(args.outputFolder, 'keggInfo.csv'), index = False, encoding='utf-8')
 
     # clinicaltrials.gov annotation
     if args.queryName:
         if v:
             print("Annotating with clinicaltrials.gov")
         ctInfo = queryClinicalTrials(drugAnnotation['names'])
-        ctInfo.to_csv('annotation/ctInfo.csv', index = False, encoding='utf-8')
+        ctInfo.to_csv(os.path.join(args.outputFolder, 'ctInfo.csv'), index = False, encoding='utf-8')
+
+
+    # Concatenate all annotations
+    if v:
+        print("Concatenating annotations")
+    # drugAnnotation = pd.merge(drugInfo, csInfo, how = 'left', on = 'drugID')
+    drugAnnotation = drugInfo
+    drugAnnotation = pd.merge(drugAnnotation, chemblInfo, how = 'left', on = 'drugID')
+    drugAnnotation = pd.merge(drugAnnotation, chebiInfo, how = 'left', on = 'drugID')
+    drugAnnotation = pd.merge(drugAnnotation, chemblAssays, how = 'left', on = 'drugID')
+    if args.queryName:
+        drugAnnotation = pd.merge(drugAnnotation, keggInfo, how = 'left', on = 'drugID')
+        drugAnnotation = pd.merge(drugAnnotation, ctInfo, how = 'left', on = 'drugID')
+
+    # save to file
+    drugAnnotation.to_csv(os.path.join(args.outputFolder, 'drugAnnotation.csv'), index = False, encoding='utf-8')
+
 
     # Create ontology
     if v:
@@ -159,10 +177,10 @@ def main():
 
     # Export ontology as term-dependent list
     universeSplit = splitOntologyTerms(universe)
-    universeSplit.to_csv('annotation/universeOntology.csv', index = False, encoding='utf-8')
+    universeSplit.to_csv(os.path.join(args.outputFolder, 'universeOntology.csv'), index = False, encoding='utf-8')
 
     if v:
-        print("Done")
+        print("Finished.")
 
 def chemSpiderQuery(smiles):
     """
@@ -200,6 +218,7 @@ def chemSpiderQuery(smiles):
 
     return csInfo
 
+
 def chemblQuery(smiles):
     """
     Queries ChEMBL with SMILES, returns matches.
@@ -215,14 +234,17 @@ def chemblQuery(smiles):
     # check ChEMBL id
     try:
         chemblSmiles = chembl.get_compounds_by_SMILES([smile for smile in smiles])
-    except SSLError:
-        raise error
+    except:
+        raise
 
-    for compound in xrange(0, len(smiles)):
-
-        # check request went well
-        if type(chemblSmiles[compound]) == dict:
-            hits = chemblSmiles[compound]['compounds']
+    for i, smile in enumerate(chemblSmiles):
+        # check request got match
+        if not type(chemblSmiles[i]) == dict:
+            if v:
+                print('No match for compound %s.' % smile)
+            chemblInfo.ix[i] = ['drug%s' % i] + [np.NaN] * 4
+        else:
+            hits = chemblSmiles[i]['compounds']
 
             # check there are hits
             if hits != []:
@@ -231,7 +253,7 @@ def chemblQuery(smiles):
                 if len(hits) == 1:
                     if v:
                         print("Only one match to a compound found %s. Saved that one." % tophit['chemblId'])
-                    chemblInfo.ix[compound] = ['drug%s' % compound, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
+                    chemblInfo.ix[i] = ['drug%s' % i, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
                 else:
                     # If there's more than one match
                     # compare hits (chemical properties)
@@ -248,7 +270,7 @@ def chemblQuery(smiles):
                     if len(hits) == 1:
                         if v:
                             print("Only one match to a compound found %s. Saved that one." % tophit['chemblId'])
-                        chemblInfo.ix[compound] = ['drug%s' % compound, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
+                        chemblInfo.ix[i] = ['drug%s' % i, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
                     else:
                         # check hits have same smile
                         h = []
@@ -264,7 +286,7 @@ def chemblQuery(smiles):
                         if len(hits) == 1:
                             if v:
                                 print("Only one match to a compound found %s. Saved that one." % tophit['chemblId'])
-                            chemblInfo.ix[compound] = ['drug%s' % compound, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
+                            chemblInfo.ix[i] = ['drug%s' % i, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
                         else:
                             # check if there's one which is a known drug
                             h = []
@@ -279,20 +301,14 @@ def chemblQuery(smiles):
                             if hits == []:
                                 if v:
                                     print("No compound is a known drug. Saving tophit %s." % tophit['chemblId'])
-                                chemblInfo.ix[compound] = ['drug%s' % compound, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
+                                chemblInfo.ix[i] = ['drug%s' % i, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
                             else:
                                 if v:
                                     print("%d compounds are known drugs. Saving tophit %s." % (len(hits), tophit['chemblId']))
-                                chemblInfo.ix[compound] = ['drug%s' % compound, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
-        else:
-            if v:
-                print('No match')
-            chemblInfo.ix[compound] = ['drug%s' % compound] + [np.NaN] * 4
-    else:
-        if v:
-            print('Error in request')
+                                chemblInfo.ix[i] = ['drug%s' % i, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
 
     return chemblInfo
+
 
 def chebiQuery(smiles):
     """
@@ -300,42 +316,45 @@ def chebiQuery(smiles):
     Requires list of smiles, outputs pandas DataFrame with hits' information.
     Information is drugID, chebiID, chebiName, chebiSmile.
     """
+    import bioservices
+    import pandas as pd
+    import numpy as np
+
     # Initiate chebi request
     chebi = bioservices.ChEBI()
 
     # initialize empty DF
     chebiInfo = pd.DataFrame(index = np.arange(len(smiles)), columns = ['drugID', 'chebiID', 'chebiName', 'chebiOntology'])
 
-    for compound in xrange(len(smiles)):
+    for compound, smile in enumerate(smiles):
         # query with smile
         try:
-            results = chebi.getStructureSearch(smiles[compound], "SMILES", structureSearchCategory = "SIMILARITY", tanimotoCutoff = 0.7)
+            results = chebi.getStructureSearch(smile, "SMILES", structureSearchCategory = "SIMILARITY", tanimotoCutoff = 0.7)
         except Exception, e:
             if v:
-                print("Error")
+                print("Error. Couldn't query CheBI for compound %s." % smile)
             chebiInfo.ix[compound] = ['drug%s' % compound] + [np.NaN] * 3
             continue
-        
-        if v:
-            print("Compound %d" % compound)
+
         # check there are results
         if results:
             if v:
-                print("Has results")
+                print("Compound %s has results" % smile)
             tophit = results[0][0]
             chebiID = tophit[0]
             chebiName = tophit[1]
 
             # annotate with ontology
-            ontology = chebi.getOntologyParents(chebiID)
+            parentOntology = chebi.getOntologyParents(chebiID)
 
             # add terms separated by '|'
             terms = ''
-            for parent in ontology[0]:
-                if terms == '':
-                    terms = str(parent[0])
-                else:
-                    terms = terms + "|" + str(parent[0])
+            if len(parentOntology) >= 1:
+                for parent in parentOntology[0]:
+                    if terms == '':
+                        terms = str(parent['chebiName'])
+                    else:
+                        terms = terms + "|" + str(parent[0])
 
             if v:
                 print('Compound drug%s has ontology terms: %s' % (compound, terms))
@@ -343,7 +362,7 @@ def chebiQuery(smiles):
             chebiInfo.ix[compound] = ['drug%s' % compound, chebiID, chebiName, terms]
         else:
             if v:
-                print("No results")
+                print("No results for compound")
             chebiInfo.ix[compound] = ['drug%s' % compound] + [np.NaN] * 3
 
         #parallel
@@ -365,7 +384,7 @@ def keggQuery(names):
     # initialize empty DF
     keggInfo = pd.DataFrame(index = np.arange(len(names)), columns = ['drugID', 'keggID', 'keggNames'])
 
-    for compound in xrange(len(names)):
+    for compound, name in enumerate(names):
         # if coumpound name is not empty
         if not pd.isnull(names[compound]):
             # get kegg id
@@ -404,35 +423,35 @@ def annotateChEMBL(df):
     # add annotation columns to DataFrame
     df['activity'] = np.NaN; df['targetChemblId'] = np.NaN; df['targetName'] = np.NaN; df['organism'] = np.NaN
 
-    for compound in xrange(0, len(df)):
-
-        ID = df['chemblID'][compound]
+    for i, ID in enumerate(df['chemblID']):
         # check if compound has ChEMBL ID
-        if ID != 'No match':
-
+        if type(ID) is not float or ID != 'No match':
             # if compound has ChEMBL ID, ask if has been used in any assay
-            if chemblActivities[compound]['bioactivities'] != []:
-                i = 0
-                for assay in chemblActivities[compound]['bioactivities']:
-                    
-                    # check compound is marked as active in assay
-                    if assay['activity_comment'] == 'Active':
-                        df['activity'][compound] = 'Active'
-                        
-                        # check if there is a target ChEMBL ID in this assay
-                        if assay['target_chemblid'] != '':
-                            df['targetChemblId'][compound] = assay['target_chemblid']
+            if type(chemblActivities[i]) is dict:
+                if chemblActivities[i]['bioactivities'] != []:
+                    for assay in chemblActivities[i]['bioactivities']:
+                        # check compound is marked as active in assay
+                        if assay['activity_comment'] == 'Active':
+                            df.loc[i, 'activity'] = 'Active'
 
-                        # check if there is a target name in this assay
-                        if assay['target_name'] != '' or assay['target_name'] != 'Unspecified' or assay['target_name'] != 'Unchecked':
-                            df['targetName'][compound] = assay['target_name']
+                            # check if there is a target ChEMBL ID in this assay
+                            if assay['target_chemblid'] != '':
+                                df.loc[i, 'targetChemblId'] = assay['target_chemblid']
 
-                        # check which organism was tested
-                        if assay['organism'] != '':
-                            df['organism'][compound] = assay['organism']
-                    else:
-                        if v:
-                            print("Compound %s is not active in assay" % df.ix[compound]['drugID'])
+                            # check if there is a target name in this assay
+                            if assay['target_name'] != '' or assay['target_name'] != 'Unspecified' or assay['target_name'] != 'Unchecked':
+                                df.loc[i, 'targetName'] = assay['target_name']
+
+                            # check which organism was tested
+                            if assay['organism'] != '':
+                                df.loc[i, 'organism'] = assay['organism']
+                        else:
+                            if v:
+                                print("Compound %s is not active in assay" % df.ix[i]['drugID'])
+                else:
+                    if v:
+                        print("No assays have been performed with compound %s." % ID)
+                    # add placeholder 'No info'
             else:
                 if v:
                     print("No assays have been performed with compound %s." % ID)
@@ -440,9 +459,11 @@ def annotateChEMBL(df):
             
         else:
             if v:
-                print("Compound %s has no ChEMBL ID." % df['drugID'][compound])
+                print("Compound %s has no ChEMBL ID." % df['drugID'][i])
             # add placeholder 'No info'
+
     return df
+
 
 def splitOntologyTerms(df):
     """
@@ -462,6 +483,7 @@ def splitOntologyTerms(df):
     SET = pd.DataFrame(SET)
     SET.columns = ['drugID', 'chebiID', 'term']
     return SET
+
 
 def queryClinicalTrials(names):
     """
@@ -526,6 +548,7 @@ def queryClinicalTrials(names):
             ctInfo.ix[compound] = ['drug%s' % compound, np.NaN, np.NaN, np.NaN]
 
     return ctInfo
+
 
 if __name__ == '__main__':
     try:
