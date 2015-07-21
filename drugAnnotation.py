@@ -147,7 +147,7 @@ def main():
     # Annotate ChEMBL info with assays
     if v:
         print("Annotating ChEMBL with assay information")
-    chemblAssays = annotateChEMBL(chemblInfo)
+    chemblAssays = annotateChEMBL(chemblInfo[['drugID', 'chemblID']])
     # write to file
     chemblAssays.to_csv(os.path.join(args.outputFolder, 'chemblAssays.csv'), index=False, encoding='utf-8')
 
@@ -171,9 +171,9 @@ def main():
         print("Concatenating annotations")
     # drugAnnotation = pd.merge(drugInfo, csInfo, how='left', on='drugID')
     drugAnnotation = drugInfo
-    drugAnnotation = pd.merge(drugAnnotation, chemblInfo, how='left', on='drugID')
-    drugAnnotation = pd.merge(drugAnnotation, chebiInfo, how='left', on='drugID')
-    drugAnnotation = pd.merge(drugAnnotation, chemblAssays, how='left', on='drugID')
+    drugAnnotation = pd.merge(drugAnnotation, chemblInfo, on='drugID') # , how='left', 
+    drugAnnotation = pd.merge(drugAnnotation, chebiInfo, on='drugID') # , how='left', 
+    drugAnnotation = pd.merge(drugAnnotation, chemblAssays, on='drugID') # , how='left', 
     if args.queryName:
         drugAnnotation = pd.merge(drugAnnotation, keggInfo, how='left', on='drugID')
         drugAnnotation = pd.merge(drugAnnotation, ctInfo, how='left', on='drugID')
@@ -324,6 +324,8 @@ def chemblQuery(smiles):
                                     print("%d compounds are known drugs. Saving tophit %s." % (len(hits), tophit['chemblId']))
                                 chemblInfo.ix[i] = ['drug%s' % i, tophit['chemblId'], tophit['preferredCompoundName'], tophit['smiles'], tophit['knownDrug']]
 
+    # rename columns to have unique ones
+    chemblInfo.rename(columns={'activity': 'chemblActivity', 'targetName': 'targetChemblName', 'organism': 'chemblOrganism'}, inplace=True)
     return chemblInfo
 
 
@@ -479,6 +481,9 @@ def annotateChEMBL(df):
                 print("Compound %s has no ChEMBL ID." % df['drugID'][i])
             # add placeholder 'No info'
 
+    df.rename(columns={"targetChemblId": "assayTargetChemblId"}, inplace=True)
+    df.drop('chemblID', axis=1, inplace=True)
+
     return df
 
 
@@ -499,6 +504,7 @@ def splitOntologyTerms(df):
 
     SET = pd.DataFrame(SET)
     SET.columns = ['drugID', 'chebiID', 'term']
+
     return SET
 
 
@@ -572,4 +578,4 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print("Program canceled by user!")
-        sys.exit(0)
+        sys.exit(1)
