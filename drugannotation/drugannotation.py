@@ -29,22 +29,23 @@ class IdMapper(object):
         self.args = args
         self.read_dbs()
 
+    def prep_db(self):
+        """
+        """
+        # get chembl db dump
+        "wget ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_20/chembl_20_mysql.tar.gz"
+        "extract chembl_20_mysql.tar.gz"
+        "mysql -p CREATE DATABASE chembl_20;"
+        "mysql -p CREATE DATABASE chembl_20;"
+        "mysql -u afr -p chembl_20 < chembl_20_mysql/chembl_20.mysqldump.sql"
+
     def read_dbs(self):
         """
         Read representation of ChEMBL database and prepare ID mappings.
         """
-        self.id_chembl_mapping = 1
-        self.id_chembl_mapping = 1
-        """
-        # get id of compound with a certain smiles
-        SELECT MOLREGNO FROM COMPOUND_STRUCTURES WHERE CANONICAL_SMILES = 'smiles'
-
-        # get chembl id of molregno id
-        SELECT CHEMBL_ID FROM CHEMBL_ID_LOOKUP WHERE ENTITY_ID = 'molregno' AND ENTITY_TYPE = 'compound'
-
-        # get chebi ID for compound
-        SELECT CHEBI_PAR_ID FROM MOLECULE_DICTIONARY WHERE CHEMBL_ID = 'chemblid'
-        """
+        self.smiles_id_mapping = "compound_structures.csv"
+        self.id_chembl_mapping = "chembl_id_lookup.csv"
+        self.chembl_chebi_mapping = "molecule_dictionary.csv"
 
     def match_smiles(self, smiles):
         self.chebi_ids = Parallel(n_jobs=self.parameters.processors)(delayed(sum)(i ** 2) for i in range(10))
