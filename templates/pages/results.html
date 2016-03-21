@@ -1,0 +1,27 @@
+{% extends 'layouts/main.html' %}
+{% block title %}Results{% endblock %}
+
+{% block css %}
+    {{ js_resources|indent(4)|safe }}
+
+    {{ css_resources|indent(4)|safe }}
+
+    {{ plot_script|indent(4)|safe }}
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Results Page</h1>
+</div>
+
+<ul>
+	<li><strong>Compound class - corrected p-value</strong></li>
+	{% for key, value in compounds.items() %}
+	<li><strong>{{key}}</strong> - {{value}}</li>
+	{% endfor %}
+</ul>
+
+{{ plot_div|indent(4)|safe }}
+
+{% endblock %}
