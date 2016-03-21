@@ -72,7 +72,7 @@ def process():
     Receive the upload smiles, process and retrieve results.
     """
     from alchemy import alchemy
-    filename = "t.csv"
+    # filename = "t.csv"
 
     if request.method == 'POST':
         render_template('pages/process.html')
