@@ -7,17 +7,19 @@ import os
 import pandas as pd
 import numpy as np
 
+from oboparser import parse_obo
+
 
 """
-wget ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_20/chembl_20_mysql.tar.gz
-extract chembl_20_mysql.tar.gz
-mysql -p CREATE DATABASE chembl_20;
-mysql -p CREATE DATABASE chembl_20;
-mysql -u afr -p chembl_20 < chembl_20_mysql/chembl_20.mysqldump.sql
+wget ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_22/chembl_22_mysql.tar.gz
+extract chembl_22_mysql.tar.gz
+mysql -p CREATE DATABASE chembl_22;
+mysql -p CREATE DATABASE chembl_22;
+mysql -u afr -p chembl_22 < chembl_22_mysql/chembl_22.mysqldump.sql
 
 mysql -u afr -p
 
-USE chembl_20;
+USE chembl_22;
 
 # get id of compound with a certain smiles
 SELECT molregno,canonical_smiles INTO OUTFILE '/tmp/compound_structures.csv' FIELDS TERMINATED BY ',' FROM compound_structures;
