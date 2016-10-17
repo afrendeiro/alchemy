@@ -15,6 +15,7 @@ from werkzeug import secure_filename
 from bokeh.embed import components
 from bokeh.plotting import figure
 from bokeh.resources import INLINE
+from bokeh.templates import RESOURCES
 from bokeh.util.string import encode_utf8
 
 # Flask settings/configs
@@ -72,55 +73,70 @@ def process():
     Receive the upload smiles, process and retrieve results.
     """
     from alchemy import alchemy
-    # filename = "t.csv"
+    from collections import OrderedDict
 
     if request.method == 'POST':
         render_template('pages/process.html')
-        file = request.files['file']
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+        input_file = request.files['input_file']
+        background_file = request.files['background_file']
+        if input_file and allowed_file(input_file.filename):
+            input_filename = secure_filename(input_file.filename)
+            input_file.save(os.path.join(app.config['UPLOAD_FOLDER'], input_filename))
+
+            if background_file and allowed_file(background_file.filename):
+                background_filename = secure_filename(background_file.filename)
+                background_file.save(os.path.join(app.config['UPLOAD_FOLDER'], background_filename))
+
+            # Assemble arguments
+            # input_file
+            args = [
+                os.path.join(app.config['UPLOAD_FOLDER'], input_filename)]
+            # background
+            if background_file and allowed_file(background_file.filename):
+                args += [
+                    "-b",
+                    os.path.join(app.config['UPLOAD_FOLDER'], background_filename)]
+            # input_type
+            args += [
+                "-t",
+                request.form.get('input_type')]
+            # delimiter
+            args += [
+                "-d",
+                request.form.get('delimiter')]
+            # header
+            # annotation_output
+            # background_annotation_output
+            # enrichment_output
+            # enrich
+            # processors
+            # tmp_dir
 
             # start processing data
-            (annotated_query, enriched_query) = alchemy.main([
-                os.path.join(app.config['UPLOAD_FOLDER'], filename),  # input_file
-                # background
-                # input_type
-                # delimiter
-                # header
-                # annotation_output
-                # background_annotation_output
-                # enrichment_output
-                # enrich
-                # processors
-                # tmp_dir
-            ])
+            annotated_query, enriched_query = alchemy.main(args)
 
             # return results
-            from collections import OrderedDict
 
             # Bokeh graph
-            # Create a polynomial line graph
-            fig = figure(title="Polynomial")
-            fig.line(range(5), range(5), color="#000000", line_width=2)
+            fig = figure(title="Volcano plot")
+            fig.scatter(enriched_query.oddsratio, enriched_query.corrected_pvalue, color="#000000")
             fig.logo = None
             fig.toolbar_location = None
 
             # Configure resources to include BokehJS inline in the document.
-            # For more details see:
-            #   http://bokeh.pydata.org/en/latest/docs/reference/resources_embedding.html#bokeh-embed
-            js_resources = INLINE.render_js()
-            css_resources = INLINE.render_css()
-
-            # For more details see:
-            #   http://bokeh.pydata.org/en/latest/docs/user_guide/embedding.html#components
-            script, div = components(fig, INLINE)
+            plot_resources = RESOURCES.render(
+                js_raw=INLINE.js_raw,
+                css_raw=INLINE.css_raw,
+                js_files=INLINE.js_files,
+                css_files=INLINE.css_files,
+            )
+            script, div = components(fig)
             html = flask.render_template(
                 'pages/results.html',
                 plot_script=script,
                 plot_div=div,
-                js_resources=js_resources,
-                css_resources=css_resources,
+                plot_resources=plot_resources,
                 compounds=OrderedDict(zip(
                     enriched_query.index, enriched_query.corrected_pvalue))
             )

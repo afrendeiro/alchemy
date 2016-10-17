@@ -3,15 +3,29 @@
 {% block content %}
 
 <div class="page-header">
-  <h1>Upload your data</h1>
+    <h1>Upload your data</h1>
 </div>
 <p class="lead">This is just a placeholder page which should be replaced with real content.</p>
 <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut tellus ligula, imperdiet id lobortis sit amet, scelerisque non sapien. Duis quis dui quis mauris dapibus fringilla. Pellentesque nec tellus ac diam volutpat malesuada.</p>
 
 <form action="/process" method=post enctype=multipart/form-data>
-      <p><input type=file name=file>
-         <input type=submit value=Upload>
-    </form>
+    <p>
+        Input file:<br>
+        <input type=file name=input_file>
+        Background file:<br>
+        <input type=file name=background_file>
+    <p>
+        Type of ID:<br>
+        <select name="input_type">
+            <option value="name">Compound Name</option>
+            <option value="smiles">SMILES</option>
+            <option value="CHEMBLID">CHEMBL ID</option>
+            <option value="CHEBIID">CHEBI ID</option>
+        </select>
+    </p>
+    <input type=submit value=Submit>
+
+</form>
 
 <p>
 {% for file in files %}
