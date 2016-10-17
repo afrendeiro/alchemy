@@ -175,9 +175,6 @@ def number_to_chebi(chebi_number):
         return pd.np.nan
 
 
-args = "-t name -a annotation.csv -e enrichment.csv ~/drugs.txt".split(" ")
-
-
 def main(args=None):
     # Parse arguments
     parser = ArgumentParser(
@@ -339,7 +336,7 @@ def main(args=None):
 
     # correct pvalues
     from statsmodels.sandbox.stats.multicomp import multipletests
-    stats_table["corrected_pvalue"] = multipletests(stats_table["pvalue"])[1]
+    stats_table["corrected_pvalue"] = multipletests(stats_table["pvalue"], method="fdr_bh")[1]
 
     # output csv
     output = contigency_table.join(stats_table)
