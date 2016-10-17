@@ -35,7 +35,7 @@ class IdMapper(object):
         self.mapping = pd.read_csv(resource_stream('alchemy', os.path.join('data', "full_mapping.existing.csv")))
 
     def annotate(self, keys, id_type="smiles"):
-        types = ["smiles", "id", "chembl", "chebi"]
+        types = ["smiles", "id", "chembl", "chebi", "name"]
         if id_type in types:
             return pd.merge(keys, self.mapping, how="left")
         else:
@@ -138,7 +138,7 @@ def add_args(parser):
                         help="Background set to compare enrichment to. Must be in same format as input file.")
     parser.add_argument("-t", "--input-type",
                         dest="input_type", type=str, default="smiles",
-                        choices=["smiles", "id", "chembl", "chebi"],
+                        choices=["smiles", "id", "chembl", "chebi", "name"],
                         help="Type of input query provided.")
     parser.add_argument("-d", "--delimiter",
                         dest="delimiter", type=str, default=",",
@@ -175,6 +175,9 @@ def number_to_chebi(chebi_number):
         return pd.np.nan
 
 
+args = "-t name -a annotation.csv -e enrichment.csv ~/drugs.txt".split(" ")
+
+
 def main(args=None):
     # Parse arguments
     parser = ArgumentParser(
@@ -196,9 +199,12 @@ def main(args=None):
     ids = IdMapper()
 
     # Get ChEBI ids
-    annotated_query = ids.annotate(keys)
+    annotated_query = ids.annotate(keys, id_type=args.input_type)
     # bring along keys without match to database
     annotated_query['chebi'] = map(number_to_chebi, annotated_query['chebi'])
+
+    if annotated_query.dropna().shape[0] < 1:
+        raise KeyError("No provided compound could be matched to database.")
 
     # Parse ChEBI ontology
     ontology = Ontology()
